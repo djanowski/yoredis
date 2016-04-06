@@ -19,8 +19,10 @@ class YoRedis {
     else {
       return Promise.resolve(this.config())
         .then(config => {
-          this.url    = URL.parse(config.url || process.env.REDIS_URL);
-          this.socket = hiredis.createConnection(this.url.port, this.url.hostname);
+          const url   = URL.parse(
+            config.url || process.env.REDIS_URL || 'redis://127.0.0.1:6379'
+          );
+          this.socket = hiredis.createConnection(url.port, url.hostname);
           this.socket
             .on('reply', data => {
               if (data instanceof Error)
