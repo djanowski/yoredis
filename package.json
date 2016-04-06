@@ -1,0 +1,26 @@
+{
+  "name": "yoredis",
+  "version": "0.1.0",
+  "description": "A minimalistic Redis client using modern Node.js.",
+  "main": "index.js",
+  "dependencies": {
+    "hiredis": "^0.4.1"
+  },
+  "devDependencies": {
+    "tape": "^4.5.1",
+    "tape-promise": "^1.0.1"
+  },
+  "scripts": {
+    "test": "node test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/djanowski/yoredis.git"
+  },
+  "author": "Damian Janowski <jano@dimaion.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/djanowski/yoredis/issues"
+  },
+  "homepage": "https://github.com/djanowski/yoredis#readme"
+}
