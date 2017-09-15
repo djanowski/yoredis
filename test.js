@@ -49,6 +49,25 @@ test('reconfigure with Promise', function(t) {
     });
 });
 
+test('multiple values in reply', function(t) {
+  return redis.call('sadd', 'bar', '1', '2')
+    .then(function() {
+      return redis.call('smembers', 'bar');
+    })
+    .then(function(reply) {
+      t.deepEqual(reply, [ '1', '2' ]);
+    });
+});
+
+test('pipelining', function(t) {
+  return redis.callMany([ [ 'ping' ], [ 'set', 'foo', 'bar' ], [ 'get', 'foo' ] ])
+    .then(function(replies) {
+      t.equal(replies[0], 'PONG');
+      t.equal(replies[1], 'OK');
+      t.equal(replies[2], 'bar');
+    });
+});
+
 test.onFinish(function() {
   redis.end();
 });

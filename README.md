@@ -49,12 +49,27 @@ redis.call('ping')
   });
 ```
 
+Pipelining
+----------
+
+```node
+redis.callMany([ [ 'ping' ], [ 'set', 'foo', 'bar' ], [ 'get', 'foo' ] ])
+  .then(function(replies) {
+    // replies is:
+    // [
+    //   'PONG',
+    //   'OK',
+    //   'bar'
+    // ]
+  })
+
+```
+
 
 Roadmap
 =======
 
 - Support streams.
-- Support pipelining.
 
 
 [vault]:   https://www.vaultproject.io
