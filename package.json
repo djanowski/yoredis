@@ -1,6 +1,6 @@
 {
   "name": "yoredis",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "A minimalistic Redis client using modern Node.js.",
   "main": "index.js",
   "dependencies": {
