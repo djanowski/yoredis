@@ -1,6 +1,6 @@
 'use strict';
 
-const test    = require('tape-promise')(require('tape'));
+const test    = require('tape-promise').default(require('tape'));
 const YoRedis = require('./index');
 
 const redis   = new YoRedis();
@@ -66,6 +66,15 @@ test('pipelining', function(t) {
       t.equal(replies[1], 'OK');
       t.equal(replies[2], 'bar');
     });
+});
+
+test('pipelining with error', async function(t) {
+  try {
+    await redis.callMany([ [ 'ping' ], [ 'set', 'foo' ], [ 'ping' ] ]);
+    t.fail('Should have rejected the promise');
+  } catch (error) {
+    t.equal(error.message, `ERR wrong number of arguments for 'set' command`);
+  }
 });
 
 test.onFinish(function() {

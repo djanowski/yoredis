@@ -1,10 +1,9 @@
 'use strict';
 
-const hiredis = require('hiredis');
-const Net     = require('net');
-const URL     = require('url');
+const RedisParser = require('redis-parser');
+const Net         = require('net');
+const URL         = require('url');
 
-const reader  = new hiredis.Reader();
 
 class YoRedis {
   constructor(config) {
@@ -12,6 +11,21 @@ class YoRedis {
       this.config = config;
     else
       this.config = function() { return config || {} };
+
+    this.parser = new RedisParser({
+      returnReply: reply => {
+        const operation = this._operations[0];
+        const complete  = operation.addReply(reply);
+        if (complete)
+          this._operations.shift();
+      },
+      returnError: error => {
+        const operation = this._operations[0];
+        const complete  = operation.addError(error);
+        if (complete)
+          this._operations.shift();
+      }
+    });
   }
 
   connect() {
@@ -26,37 +40,11 @@ class YoRedis {
           this.socket = Net.createConnection(url.port, url.hostname);
           this.socket
             .on('data', data => {
-              const operation = this._operations.shift();
-
-              reader.feed(data);
-
-              let replies = [];
-              let error;
-
-              while (true) {
-                const reply = reader.get();
-
-                if (reply === undefined)
-                  break;
-                else if (reply instanceof Error)
-                  error = reply;
-
-                replies.push(reply);
-              }
-
-              const pipelineSize = operation[0];
-              const resolve      = operation[1];
-              const reject       = operation[2];
-
-              if (error)
-                reject(error);
-              else if (pipelineSize === 0)
-                resolve(replies[0]);
-              else
-                resolve(replies);
+              this.parser.execute(data);
             })
             .on('error', error => {
-              this._operations.shift()[2](error);
+              const operation = this._operations.shift();
+              operation.reject(error);
             });
 
           this._operations = [];
@@ -68,7 +56,7 @@ class YoRedis {
     return this.connect()
       .then(() => {
         return new Promise((resolve, reject) => {
-          this._operations.push([ 0, resolve, reject ]);
+          this._operations.push(new Operation(resolve, reject));
           const respArray = createCommand([ Array.prototype.slice.call(arguments, 0) ]);
           this.socket.write(respArray);
         });
@@ -79,7 +67,7 @@ class YoRedis {
     return this.connect()
       .then(() => {
         return new Promise((resolve, reject) => {
-          this._operations.push([ commands.length, resolve, reject ]);
+          this._operations.push(new PipelineOperation(resolve, reject, commands.length));
           const respArray = createCommand(commands);
           this.socket.write(respArray);
         });
@@ -95,11 +83,57 @@ class YoRedis {
 }
 
 
+class Operation {
+  constructor(resolve, reject) {
+    this.resolve = resolve;
+    this.reject  = reject;
+  }
+
+  addReply(reply) {
+    this.resolve(reply);
+    return true;
+  }
+
+  addError(error) {
+    this.reject(error);
+    return true;
+  }
+}
+
+class PipelineOperation {
+  constructor(resolve, reject, size) {
+    this.resolve = resolve;
+    this.reject  = reject;
+    this.size    = size;
+    this.replies = [];
+  }
+
+  addReply(reply) {
+    this.replies.push(reply);
+    if (this.replies.length === this.size) {
+      if (this.error)
+        this.reject(this.error);
+      else
+        this.resolve(this.replies);
+      return true;
+    }
+  }
+
+  addError(error) {
+    if (!this.error)
+      this.error = error;
+    this.replies.push(error);
+    if (this.replies.length === this.size)
+      this.reject(this.error);
+  }
+}
+
+
 // -- RESP --
 
-const bufStar   = new Buffer('*', 'ascii');
-const bufDollar = new Buffer('$', 'ascii');
-const bufCrlf   = new Buffer('\r\n', 'ascii');
+const bufStar   = Buffer.from('*', 'ascii');
+const bufDollar = Buffer.from('$', 'ascii');
+const bufCrlf   = Buffer.from('\r\n', 'ascii');
 
 
 function createCommand(commands) {
@@ -111,7 +145,7 @@ function createCommand(commands) {
 
 function toRESPArray(command) {
   const respStrings = command.map(toRESPBulkString);
-  const stringCount = new Buffer(String(respStrings.length), 'ascii');
+  const stringCount = Buffer.from(String(respStrings.length), 'ascii');
   const respArray   = Buffer.concat([
     bufStar, stringCount, bufCrlf, ... respStrings
   ]);
@@ -120,8 +154,8 @@ function toRESPArray(command) {
 
 
 function toRESPBulkString(string) {
-  const asciiString    = new Buffer(string, 'ascii');
-  const byteLength     = new Buffer(String(asciiString.length), 'ascii');
+  const asciiString    = Buffer.from(string, 'ascii');
+  const byteLength     = Buffer.from(String(asciiString.length), 'ascii');
   const totalLength    = bufDollar.length + byteLength.length + bufCrlf.length + asciiString.length + bufCrlf.length;
   const respBulkString = Buffer.concat([
     bufDollar, byteLength, bufCrlf, asciiString, bufCrlf
