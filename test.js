@@ -77,6 +77,19 @@ test('pipelining with error', async function(t) {
   }
 });
 
+test('return buffers', async function(t) {
+  const redisWithBuffers = new YoRedis({ returnBuffers: true });
+
+  try {
+    await redisWithBuffers.call('set', 'foo', 'bar');
+    const actual   = await redisWithBuffers.call('get', 'foo');
+    const expected = Buffer.from('bar');
+    t.equal(actual.compare(expected), 0);
+  } finally {
+    redisWithBuffers.end();
+  }
+});
+
 test.onFinish(function() {
   redis.end();
 });

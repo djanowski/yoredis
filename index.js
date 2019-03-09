@@ -11,21 +11,6 @@ class YoRedis {
       this.config = config;
     else
       this.config = function() { return config || {} };
-
-    this.parser = new RedisParser({
-      returnReply: reply => {
-        const operation = this._operations[0];
-        const complete  = operation.addReply(reply);
-        if (complete)
-          this._operations.shift();
-      },
-      returnError: error => {
-        const operation = this._operations[0];
-        const complete  = operation.addError(error);
-        if (complete)
-          this._operations.shift();
-      }
-    });
   }
 
   connect() {
@@ -34,6 +19,7 @@ class YoRedis {
     else {
       return Promise.resolve(this.config())
         .then(config => {
+          this._initializeParser(config);
           const url   = URL.parse(
             config.url || process.env.REDIS_URL || 'redis://127.0.0.1:6379'
           );
@@ -79,6 +65,24 @@ class YoRedis {
       this.socket.end();
       this.socket = null;
     }
+  }
+
+  _initializeParser(config) {
+    this.parser = new RedisParser({
+      returnBuffers: config.returnBuffers,
+      returnReply: reply => {
+        const operation = this._operations[0];
+        const complete  = operation.addReply(reply);
+        if (complete)
+          this._operations.shift();
+      },
+      returnError: error => {
+        const operation = this._operations[0];
+        const complete  = operation.addError(error);
+        if (complete)
+          this._operations.shift();
+      }
+    });
   }
 }
 
