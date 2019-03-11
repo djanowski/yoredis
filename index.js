@@ -20,10 +20,10 @@ class YoRedis {
       return Promise.resolve(this.config())
         .then(config => {
           this._initializeParser(config);
-          const url   = URL.parse(
+          this.url = URL.parse(
             config.url || process.env.REDIS_URL || 'redis://127.0.0.1:6379'
           );
-          this.socket = Net.createConnection(url.port, url.hostname);
+          this.socket = Net.createConnection(this.url.port, this.url.hostname);
           this.socket
             .on('data', data => {
               this.parser.execute(data);
@@ -34,7 +34,8 @@ class YoRedis {
             });
 
           this._operations = [];
-        });
+        })
+        .then(() => this._authenticate())
     }
   }
 
@@ -83,6 +84,17 @@ class YoRedis {
           this._operations.shift();
       }
     });
+  }
+
+  _authenticate() {
+    if (this.url.auth) {
+      const password = this.url.auth.split(':')[1];
+      return new Promise((resolve, reject) => {
+        this._operations.push(new Operation(resolve, reject));
+        const respArray = createCommand([ [ 'auth', password ]]);
+        this.socket.write(respArray);
+      });
+    }
   }
 }
 

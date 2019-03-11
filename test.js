@@ -90,6 +90,21 @@ test('return buffers', async function(t) {
   }
 });
 
+test('auth', async function(t) {
+  const redisWithAuth = new YoRedis({ url: 'redis://:s3cr3t@localhost:6379' });
+
+  try {
+    await redisWithAuth.call('get', 'foo');
+    t.fail('Should have failed');
+  } catch (error) {
+    const actual   = error.message;
+    const expected = 'ERR Client sent AUTH, but no password is set';
+    t.equal(actual, expected);
+  } finally {
+    redisWithAuth.end();
+  }
+});
+
 test.onFinish(function() {
   redis.end();
 });
